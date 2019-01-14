@@ -183,7 +183,7 @@ public class NeuralNetwork implements Serializable {
         while (--l > 0) {
             for (int i = 0; i < unitNum[l]; ++i) {
                 error = 0;
-                for (int j = 0; j < unitNum[l + 1]; ++j) {
+                for (int j = 0; j < (unitNum[l + 1] - (l + 1 == depth - 1 ? 0 : 1)); ++j) {
                     error += weights[l][i][j] * errors[l + 1][j];
                 }
                 theta = a[l][i] * (1 - a[l][i]);

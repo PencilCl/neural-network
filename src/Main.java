@@ -2,7 +2,7 @@ import java.util.Arrays;
 
 public class Main {
     public static void main(String[] args) {
-        NeuralNetwork net = new NeuralNetwork(new int[]{15}, new String[]{"sigmoid"}, 0.05f);
+        NeuralNetwork net = new NeuralNetwork(new int[]{15, 15}, new String[]{"sigmoid"}, 0.05f);
 
         /**
          * = = = = = = = = = = =
@@ -14,7 +14,7 @@ public class Main {
         float[][] label = new float[][]{{1,0},{0,1},{0,1},{1,0}};
 
         System.out.println("正在训练...");
-        net.train(data, label, 5000);
+        net.train(data, label, 50000);
         System.out.println("训练完毕!");
 
         // 根据训练结果来检验样本数据
