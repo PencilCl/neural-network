@@ -4,6 +4,8 @@ public class NeuralNetwork implements Serializable {
     private static final float SQRT6 = (float) Math.sqrt(6);
     private static final int DEFAULT_EPOCH = 1000;
 
+    private static final float MOMENTUM = 0.9f;
+
     private int[] unitNum;
     private String[] activationFunc;
     private float lr;
@@ -14,6 +16,8 @@ public class NeuralNetwork implements Serializable {
     transient private float[][] label;
     transient private int epoch;
     private float[][] a;
+
+    transient private float[][][] v;
 
     private int depth;
 
@@ -96,16 +100,20 @@ public class NeuralNetwork implements Serializable {
      * 初始化变量
      */
     private void initVar() {
-        // create weights variable
+        // create weights and velocity
         weights = new float[depth][][];
+        v = new float[depth][][];
         for (int i = 0; i < depth - 1; ++i) {
             weights[i] = new float[unitNum[i]][];
+            v[i] = new float[unitNum[i]][];
             for (int j = 0; j < unitNum[i]; ++j) {
                 if (i + 1 == depth - 1) {
                     weights[i][j] = new float[unitNum[i + 1]];
+                    v[i][j] = new float[unitNum[i + 1]];
                 } else {
                     // 偏置单元不需要和上一层连接
                     weights[i][j] = new float[unitNum[i + 1] - 1];
+                    v[i][j] = new float[unitNum[i + 1] - 1];
                 }
             }
         }
@@ -144,7 +152,7 @@ public class NeuralNetwork implements Serializable {
             for (int j = 0; j < trainData.length; ++j) {
                 forward(trainData[j]);
                 backward(label[j]);
-                updateWeight();
+                sgrOptimizeWithMomentum();
             }
         }
     }
@@ -192,11 +200,28 @@ public class NeuralNetwork implements Serializable {
         }
     }
 
-    private void updateWeight() {
+    /**
+     * SGR (Stochastic gradient descent, 随机梯度下降)
+     */
+    private void sgrOptimize() {
         for (int l = 0; l < depth - 1; ++l) {
             for (int i = 0; i < unitNum[l]; ++i) {
                 for (int j = 0; j < weights[l][i].length; ++j) {
                     weights[l][i][j] -= errors[l + 1][j] * a[l][i] * this.lr;
+                }
+            }
+        }
+    }
+
+    /**
+     * 带动量项 SGR
+     */
+    private void sgrOptimizeWithMomentum() {
+        for (int l = 0; l < depth - 1; ++l) {
+            for (int i = 0; i < unitNum[l]; ++i) {
+                for (int j = 0; j < weights[l][i].length; ++j) {
+                    v[l][i][j] = MOMENTUM * v[l][i][j] + (1 - MOMENTUM) * a[l][i] * errors[l + 1][j];
+                    weights[l][i][j] -=  this.lr * v[l][i][j];
                 }
             }
         }
