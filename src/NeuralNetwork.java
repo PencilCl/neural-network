@@ -6,8 +6,6 @@ public class NeuralNetwork implements Serializable {
     private static final float SQRT6 = (float) Math.sqrt(6);
     private static final int DEFAULT_EPOCH = 1000;
 
-    private static final float MOMENTUM = 0.9f;
-
     private int[] unitNum;
     private String[] activationFunc;
     private float lr;
@@ -19,6 +17,7 @@ public class NeuralNetwork implements Serializable {
     transient private int epoch;
     private float[][] a;
 
+    private float momentum;
     transient private float[][][] v;
 
     private int depth;
@@ -56,8 +55,13 @@ public class NeuralNetwork implements Serializable {
     }
 
     public NeuralNetwork(int[] hiddenLayerUnitNum, String[] activationFunc, float learningRate) {
+        this(hiddenLayerUnitNum, activationFunc, learningRate, 0);
+    }
+
+    public NeuralNetwork(int[] hiddenLayerUnitNum, String[] activationFunc, float learningRate, float momentum) {
         this.activationFunc = activationFunc;
         this.lr = learningRate;
+        this.momentum = momentum;
         this.depth = hiddenLayerUnitNum.length + 2;
 
         this.unitNum = new int[this.depth];
@@ -114,23 +118,9 @@ public class NeuralNetwork implements Serializable {
      * 初始化变量
      */
     private void initVar() {
-        // create weights and velocity
+        // create weights
         weights = new float[depth][][];
-        v = new float[depth][][];
-        for (int i = 0; i < depth - 1; ++i) {
-            weights[i] = new float[unitNum[i]][];
-            v[i] = new float[unitNum[i]][];
-            for (int j = 0; j < unitNum[i]; ++j) {
-                if (i + 1 == depth - 1) {
-                    weights[i][j] = new float[unitNum[i + 1]];
-                    v[i][j] = new float[unitNum[i + 1]];
-                } else {
-                    // 偏置单元不需要和上一层连接
-                    weights[i][j] = new float[unitNum[i + 1] - 1];
-                    v[i][j] = new float[unitNum[i + 1] - 1];
-                }
-            }
-        }
+        createWeights(weights);
         // init weights
         for (int i = 0; i < depth - 1; ++i) {
             float bound = (float) (SQRT6 / Math.sqrt(unitNum[i] + unitNum[i + 1]));
@@ -156,31 +146,53 @@ public class NeuralNetwork implements Serializable {
         for (int i = 1; i < depth; ++i) {
             errors[i] = new float[unitNum[i]];
         }
+
+        // create velocity
+        if (this.momentum != 0) {
+            v = new float[depth][][];
+            createWeights(v);
+        }
+    }
+
+    private void createWeights(float[][][] w) {
+        for (int i = 0; i < depth - 1; ++i) {
+            w[i] = new float[unitNum[i]][];
+            for (int j = 0; j < unitNum[i]; ++j) {
+                if (i + 1 == depth - 1) {
+                    w[i][j] = new float[unitNum[i + 1]];
+                } else {
+                    w[i][j] = new float[unitNum[i + 1] - 1];
+                }
+            }
+        }
     }
 
     private void train() {
         float[][] trainData = this.trainData;
         float[][] label = this.label;
 
-        float loss;
         for (int i = 0; i < epoch; ++i) {
             for (int j = 0; j < trainData.length; ++j) {
                 forward(trainData[j]);
                 backward(label[j]);
-                sgrOptimizeWithMomentum();
+                sgdOptimize();
             }
 
-            // report
-            if (listeners.size() > 0) {
-                loss = 0;
-                for (int j = 0; j < unitNum[depth - 1]; ++j) {
-                    loss += Math.abs(errors[depth - 1][j]);
-                }
-                loss /= unitNum[depth - 1];
+            report(i + 1);
+        }
+    }
 
-                for (OnEpochUpdateListener listener : listeners) {
-                    listener.onUpdate(i + 1, loss);
-                }
+    private void report(int epoch) {
+        float loss;
+        if (listeners.size() > 0) {
+            loss = 0;
+            for (int j = 0; j < unitNum[depth - 1]; ++j) {
+                loss += Math.abs(errors[depth - 1][j]);
+            }
+            loss /= unitNum[depth - 1];
+
+            for (OnEpochUpdateListener listener : listeners) {
+                listener.onUpdate(epoch, loss);
             }
         }
     }
@@ -229,27 +241,20 @@ public class NeuralNetwork implements Serializable {
     }
 
     /**
-     * SGR (Stochastic gradient descent, 随机梯度下降)
+     * SGD (Stochastic gradient descent, 随机梯度下降)
      */
-    private void sgrOptimize() {
+    private void sgdOptimize() {
+        float theta;
         for (int l = 0; l < depth - 1; ++l) {
             for (int i = 0; i < unitNum[l]; ++i) {
                 for (int j = 0; j < weights[l][i].length; ++j) {
-                    weights[l][i][j] -= errors[l + 1][j] * a[l][i] * this.lr;
-                }
-            }
-        }
-    }
-
-    /**
-     * 带动量项 SGR
-     */
-    private void sgrOptimizeWithMomentum() {
-        for (int l = 0; l < depth - 1; ++l) {
-            for (int i = 0; i < unitNum[l]; ++i) {
-                for (int j = 0; j < weights[l][i].length; ++j) {
-                    v[l][i][j] = MOMENTUM * v[l][i][j] + (1 - MOMENTUM) * a[l][i] * errors[l + 1][j];
-                    weights[l][i][j] -=  this.lr * v[l][i][j];
+                    if (momentum == 0) {
+                        theta = errors[l + 1][j] * a[l][i] * lr;
+                    } else {
+                        v[l][i][j] = momentum * v[l][i][j] + (1 - momentum) * a[l][i] * errors[l + 1][j];
+                        theta = lr * v[l][i][j];
+                    }
+                    weights[l][i][j] -= theta;
                 }
             }
         }
