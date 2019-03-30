@@ -1,4 +1,6 @@
 import java.io.*;
+import java.util.HashSet;
+import java.util.Set;
 
 public class NeuralNetwork implements Serializable {
     private static final float SQRT6 = (float) Math.sqrt(6);
@@ -20,6 +22,8 @@ public class NeuralNetwork implements Serializable {
     transient private float[][][] v;
 
     private int depth;
+
+    transient private Set<OnEpochUpdateListener> listeners;
 
     public static boolean saveNetwork(NeuralNetwork net, String filePath) {
         try {
@@ -61,6 +65,8 @@ public class NeuralNetwork implements Serializable {
             // 隐藏层增加一个偏置单元
             unitNum[i] = hiddenLayerUnitNum[i - 1] + 1;
         }
+
+        listeners = new HashSet<>();
     }
 
     public void train(float[][] trainData, float[][] label) {
@@ -94,6 +100,14 @@ public class NeuralNetwork implements Serializable {
         forward(testData);
         System.arraycopy(a[depth - 1], 0, pred, 0, unitNum[depth - 1]);
         return pred;
+    }
+
+    public void setOnEpochUpdateListener(OnEpochUpdateListener listener) {
+        listeners.add(listener);
+    }
+
+    public void removeOnEpochUpdateListener(OnEpochUpdateListener listener) {
+        listeners.remove(listener);
     }
 
     /**
@@ -148,11 +162,25 @@ public class NeuralNetwork implements Serializable {
         float[][] trainData = this.trainData;
         float[][] label = this.label;
 
+        float loss;
         for (int i = 0; i < epoch; ++i) {
             for (int j = 0; j < trainData.length; ++j) {
                 forward(trainData[j]);
                 backward(label[j]);
                 sgrOptimizeWithMomentum();
+            }
+
+            // report
+            if (listeners.size() > 0) {
+                loss = 0;
+                for (int j = 0; j < unitNum[depth - 1]; ++j) {
+                    loss += Math.abs(errors[depth - 1][j]);
+                }
+                loss /= unitNum[depth - 1];
+
+                for (OnEpochUpdateListener listener : listeners) {
+                    listener.onUpdate(i + 1, loss);
+                }
             }
         }
     }
@@ -240,4 +268,7 @@ public class NeuralNetwork implements Serializable {
         return (float) Math.random() * bound * 2 - bound;
     }
 
+    public interface OnEpochUpdateListener {
+        void onUpdate(int epoch, float loss);
+    }
 }

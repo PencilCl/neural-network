@@ -14,7 +14,13 @@ public class Main {
         float[][] label = new float[][]{{1,0},{0,1},{0,1},{1,0}};
 
         System.out.println("正在训练...");
-        net.train(data, label, 50000);
+        net.setOnEpochUpdateListener(new NeuralNetwork.OnEpochUpdateListener() {
+            @Override
+            public void onUpdate(int epoch, float loss) {
+                System.out.println(String.format("Epoch: %d, Loss: %.5f", epoch, loss));
+            }
+        });
+        net.train(data, label, 10000);
         System.out.println("训练完毕!");
 
         // 根据训练结果来检验样本数据
