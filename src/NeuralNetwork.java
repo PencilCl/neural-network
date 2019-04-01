@@ -21,6 +21,7 @@ public class NeuralNetwork implements Serializable {
     transient private float[][][] v;
 
     private int depth;
+    private boolean stop;
 
     transient private Set<OnEpochUpdateListener> listeners;
 
@@ -171,6 +172,8 @@ public class NeuralNetwork implements Serializable {
         float[][] trainData = this.trainData;
         float[][] label = this.label;
 
+        stop = false;
+
         for (int i = 0; i < epoch; ++i) {
             for (int j = 0; j < trainData.length; ++j) {
                 forward(trainData[j]);
@@ -179,7 +182,15 @@ public class NeuralNetwork implements Serializable {
             }
 
             report(i + 1);
+
+            if (stop) {
+                break;
+            }
         }
+    }
+
+    public void stopTrain() {
+        stop = true;
     }
 
     private void report(int epoch) {
@@ -251,8 +262,8 @@ public class NeuralNetwork implements Serializable {
                     if (momentum == 0) {
                         theta = errors[l + 1][j] * a[l][i] * lr;
                     } else {
-                        v[l][i][j] = momentum * v[l][i][j] + (1 - momentum) * a[l][i] * errors[l + 1][j];
-                        theta = lr * v[l][i][j];
+                        v[l][i][j] = momentum * v[l][i][j] + lr * a[l][i] * errors[l + 1][j];
+                        theta = v[l][i][j];
                     }
                     weights[l][i][j] -= theta;
                 }
